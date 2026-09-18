@@ -5,21 +5,53 @@ CREATE TABLE IF NOT EXISTS giveaways (
     giveaway_type TEXT NOT NULL,
     status TEXT NOT NULL,
     detected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    source_channel_username TEXT,
+    confidence DOUBLE PRECISION,
+    needs_human BOOLEAN NOT NULL DEFAULT false,
+    reason TEXT,
+    plan JSONB NOT NULL DEFAULT '{}'::jsonb,
     UNIQUE(chat_id, message_id)
 );
+
+ALTER TABLE giveaways
+    ADD COLUMN IF NOT EXISTS source_channel_username TEXT;
+ALTER TABLE giveaways
+    ADD COLUMN IF NOT EXISTS confidence DOUBLE PRECISION;
+ALTER TABLE giveaways
+    ADD COLUMN IF NOT EXISTS needs_human BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE giveaways
+    ADD COLUMN IF NOT EXISTS reason TEXT;
+ALTER TABLE giveaways
+    ADD COLUMN IF NOT EXISTS plan JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE INDEX IF NOT EXISTS idx_giveaways_detected_at
 ON giveaways(detected_at);
 
+CREATE INDEX IF NOT EXISTS idx_giveaways_status
+ON giveaways(status);
+
 CREATE TABLE IF NOT EXISTS participation_actions (
     id BIGSERIAL PRIMARY KEY,
     giveaway_id BIGINT REFERENCES giveaways(id) ON DELETE CASCADE,
+    step_index INTEGER NOT NULL DEFAULT 0,
+    action_code INTEGER,
     action_type TEXT NOT NULL,
+    sequence_id TEXT,
     payload JSONB NOT NULL DEFAULT '{}'::jsonb,
     status TEXT NOT NULL,
     executed_at TIMESTAMPTZ,
     error TEXT
 );
+
+ALTER TABLE participation_actions
+    ADD COLUMN IF NOT EXISTS step_index INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE participation_actions
+    ADD COLUMN IF NOT EXISTS action_code INTEGER;
+ALTER TABLE participation_actions
+    ADD COLUMN IF NOT EXISTS sequence_id TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_actions_giveaway
+ON participation_actions(giveaway_id);
 
 CREATE TABLE IF NOT EXISTS tracked_messages (
     id BIGSERIAL PRIMARY KEY,

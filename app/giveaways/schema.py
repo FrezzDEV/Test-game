@@ -74,6 +74,10 @@ class GiveawayPlan(BaseModel):
     reason: str | None = None
     conditions: list[str] = Field(default_factory=list)
 
+    @property
+    def has_number_action(self) -> bool:
+        return any(action.code == ACTION_NUMBER_GUESS for action in self.actions)
+
     @model_validator(mode="after")
     def normalize_action_codes(self):
         actual = [action.code for action in self.actions]

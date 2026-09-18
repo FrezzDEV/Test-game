@@ -21,6 +21,9 @@ def _invalid_ai_plan(reason: str) -> dict:
 
 
 def _normalize_payload(data: dict) -> dict:
+    if not isinstance(data, dict):
+        raise TypeError("AI response must be a JSON object")
+
     normalized = dict(data)
 
     if "detected" not in normalized and "is_giveaway" in normalized:
@@ -29,6 +32,8 @@ def _normalize_payload(data: dict) -> dict:
     action_codes_by_type = {value: key for key, value in ACTION_TYPES.items()}
     actions = []
     for raw_action in normalized.get("actions", []) or []:
+        if not isinstance(raw_action, dict):
+            raise TypeError("Each AI action must be an object")
         action = dict(raw_action)
         action_type = action.get("type")
         if "code" not in action and action_type in action_codes_by_type:
@@ -50,6 +55,8 @@ Analyze a Telegram post and extract ONLY the participation rules.
 Do not solve puzzles unless the answer is explicitly present in the post.
 Do not invent usernames, answers, comments, ranges, buttons, emojis, or requirements.
 The executor will perform actions later; your job is to describe the plan.
+You receive ONLY the source channel post text. You do not have access to the
+linked discussion, chat history, polls, buttons, entities, or any other Telegram data.
 
 Return ONLY valid JSON with this exact top-level structure:
 {
@@ -76,7 +83,7 @@ Return ONLY valid JSON with this exact top-level structure:
     {
       "code": 1,
       "type": "reply_discussion",
-      "target": "source_post",
+      "target": "discussion",
       "channel_username": null,
       "button_text": null,
       "emoji": null,
@@ -106,8 +113,10 @@ Action code map:
 Rules:
 - "detected" is true only when the post is actually a giveaway/contest.
 - "channel_username" means the SOURCE channel where this post was detected. The application supplies it separately; never guess it from a random linked channel.
-- "action_codes" must be in the exact execution order and must match actions[].code.
+- "action_codes" must be in the exact execution order and must match actions[].code exactly.
+- The application rejects inconsistent action_codes; never use a different order.
 - For action code 1, NEVER generate the final comment text. Return only "sequence_id".
+- Code 1 always targets the linked discussion/comments of the source post. Do not return another target.
 - write_sequence_id must be one of the allowed sequence IDs below.
 - A sequence is a local, pre-approved path of text/messages. The model may select an ID, but never invent its content.
 - For action code 2, return the required channel username exactly as written or as an unambiguous public username.
@@ -115,7 +124,7 @@ Rules:
 - For action code 4, return the exact required emoji if known.
 - For action code 5, auto-execution is allowed only when the exact answer/button is explicitly present in the post; otherwise needs_human=true.
 - For action code 6, use number_value when an exact number is explicitly given. If the post explicitly provides a valid numeric range, min_number/max_number may be used. Never invent a target or range.
-- For actions that send a text/number answer, set target only when the post explicitly indicates where to send it. Use "discussion" for the linked discussion/comments and "source_post" for a direct reply to the source post.
+- For actions that send a text/number answer, do not infer hidden destinations. Code 1 is always the linked discussion.
 - For action code 7, use word_answer only when the exact word is explicitly present. Otherwise needs_human=true.
 - CAPTCHA, anti-bot checks, external web forms, ambiguous instructions, or missing critical data => needs_human=true.
 - If there are multiple required actions, return multiple action objects in the exact order required.

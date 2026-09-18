@@ -800,18 +800,22 @@ async def find_related_giveaway(
         if row:
             return dict(row)
 
-    row = await pool.fetchrow(
+    rows = await pool.fetch(
         """
         SELECT id,chat_id,message_id,source_channel_username,detected_at
         FROM giveaways
         WHERE chat_id=$1
           AND detected_at >= now()-interval '30 days'
+          AND status <> 'skipped'
         ORDER BY detected_at DESC
-        LIMIT 1
+        LIMIT 2
         """,
         chat_id,
     )
-    return dict(row) if row else None
+    # Do not guess which giveaway a free-standing winner post belongs to.
+    if len(rows) == 1:
+        return dict(rows[0])
+    return None
 
 
 async def claim_notification(dedupe_key: str) -> bool:

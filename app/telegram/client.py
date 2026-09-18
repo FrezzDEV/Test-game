@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from telethon import TelegramClient, events
 
 from app.config import (
@@ -8,6 +10,7 @@ from app.config import (
     TG_API_ID,
     TG_PHONE,
     TG_SESSION,
+    TG_SESSION_DIR,
 )
 from app.database.db import already_processed, mark_processed
 from app.giveaways.detector import detect
@@ -16,7 +19,10 @@ from app.admin.notifier import notify
 from app.telegram.actions import ActionExecutor
 
 
-client = TelegramClient(TG_SESSION, TG_API_ID, TG_API_HASH)
+Path(TG_SESSION_DIR).mkdir(parents=True, exist_ok=True)
+SESSION_PATH = str(Path(TG_SESSION_DIR) / TG_SESSION)
+
+client = TelegramClient(SESSION_PATH, TG_API_ID, TG_API_HASH)
 executor = ActionExecutor(client)
 
 
@@ -25,7 +31,6 @@ async def handle_message(event) -> None:
     if not text or not event.chat_id:
         return
 
-    # Keep every incoming message eligible for reply/mention notifications.
     await notify.incoming_message(event)
 
     if await already_processed(event.chat_id, event.id):
@@ -75,8 +80,11 @@ async def run_telegram_client() -> None:
     if TG_2FA_PASSWORD:
         kwargs["password"] = TG_2FA_PASSWORD
 
-    client.add_event_handler(handle_message, events.NewMessage(chats=MONITORED_CHATS or None))
+    client.add_event_handler(
+        handle_message,
+        events.NewMessage(chats=MONITORED_CHATS or None),
+    )
     await client.start(**kwargs)
     await notify.start_user_client(client)
-    print("Telegram giveaway client started")
+    print(f"Telegram giveaway client started; session: {SESSION_PATH}")
     await client.run_until_disconnected()

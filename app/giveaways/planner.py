@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 from app.giveaways.schema import (
     ACTION_CLICK_BUTTON,
     ACTION_JOIN_CHANNEL,
@@ -11,6 +14,17 @@ from app.giveaways.schema import (
 from app.giveaways.sequences import get_sequence
 
 
+def action_key(action: dict) -> str:
+    payload = {
+        key: value
+        for key, value in action.items()
+        if key != "number_value"
+        or action.get("min_number") == action.get("max_number")
+    }
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 def build_plan(parsed: dict) -> list[dict]:
     try:
         plan = GiveawayPlan.model_validate(parsed)
@@ -21,6 +35,7 @@ def build_plan(parsed: dict) -> list[dict]:
         return []
 
     result: list[dict] = []
+    number_action_count = 0
 
     for action in plan.actions:
         data = action.model_dump()
@@ -51,6 +66,7 @@ def build_plan(parsed: dict) -> list[dict]:
                 return []
 
         elif action.code == ACTION_NUMBER_GUESS:
+            number_action_count += 1
             if action.number_value is None:
                 if action.min_number is None or action.max_number is None:
                     return []
@@ -64,9 +80,11 @@ def build_plan(parsed: dict) -> list[dict]:
                 data["word_answer"] = action.exact_answer
 
         else:
-            # Reserved/unknown action codes are never executed implicitly.
             return []
 
         result.append(data)
+
+    if number_action_count > 1:
+        return []
 
     return result

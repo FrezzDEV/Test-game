@@ -143,8 +143,6 @@ class AccountManager:
         if not await self._is_broadcast_channel(event):
             return
 
-        await notify.incoming_message(event)
-
         marker = self._event_marker(event, kind)
         claimed = await claim_channel_event(
             chat_id=event.chat_id,
@@ -154,6 +152,10 @@ class AccountManager:
         )
         if not claimed:
             return
+
+        # Only the first database claimant handles channel notifications,
+        # preventing one notification per account for the same post/edit.
+        await notify.incoming_message(event)
 
         chat = await event.get_chat()
         source_username = getattr(chat, "username", None)

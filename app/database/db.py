@@ -226,6 +226,24 @@ async def reserve_number(
 
             for _ in range(40):
                 candidate = random.randint(int(minimum), int(maximum))
+
+                historical = await conn.fetchval(
+                    """
+                    SELECT EXISTS (
+                        SELECT 1
+                        FROM participation_actions pa
+                        WHERE pa.giveaway_id=$1
+                          AND pa.action_code=6
+                          AND pa.status='success'
+                          AND pa.payload->>'number_value'=$2
+                    )
+                    """,
+                    giveaway_id,
+                    str(candidate),
+                )
+                if historical:
+                    continue
+
                 row = await conn.fetchrow(
                     """
                     INSERT INTO number_pool(

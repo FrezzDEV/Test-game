@@ -115,6 +115,7 @@ Rules:
 - For action code 4, return the exact required emoji if known.
 - For action code 5, auto-execution is allowed only when the exact answer/button is explicitly present in the post; otherwise needs_human=true.
 - For action code 6, use number_value when an exact number is explicitly given. If the post explicitly provides a valid numeric range, min_number/max_number may be used. Never invent a target or range.
+- For actions that send a text/number answer, set target only when the post explicitly indicates where to send it. Use "discussion" for the linked discussion/comments and "source_post" for a direct reply to the source post.
 - For action code 7, use word_answer only when the exact word is explicitly present. Otherwise needs_human=true.
 - CAPTCHA, anti-bot checks, external web forms, ambiguous instructions, or missing critical data => needs_human=true.
 - If there are multiple required actions, return multiple action objects in the exact order required.

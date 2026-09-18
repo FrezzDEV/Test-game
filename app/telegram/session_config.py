@@ -65,10 +65,16 @@ def credential_candidates(
         candidates.append(env_credentials)
 
     if override and override.api_id and override.api_hash:
+        override_with_fallbacks = SessionCredentials(
+            api_id=override.api_id,
+            api_hash=override.api_hash,
+            phone=override.phone or env_credentials.phone,
+            two_fa_password=override.two_fa_password or env_credentials.two_fa_password,
+        )
         if not candidates or (
-            candidates[0].api_id != override.api_id
-            or candidates[0].api_hash != override.api_hash
+            candidates[0].api_id != override_with_fallbacks.api_id
+            or candidates[0].api_hash != override_with_fallbacks.api_hash
         ):
-            candidates.append(override)
+            candidates.append(override_with_fallbacks)
 
     return candidates

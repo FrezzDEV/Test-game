@@ -58,6 +58,15 @@ ACTION_RETRY_DELAY_SECONDS = max(
 RETRY_POLL_SECONDS = max(1, int(os.getenv("RETRY_POLL_SECONDS", "5")))
 REMINDER_POLL_SECONDS = max(1, int(os.getenv("REMINDER_POLL_SECONDS", "15")))
 
+# Retry / scheduler controls
+NUMBER_SEND_RETRIES = max(1, int(os.getenv("NUMBER_SEND_RETRIES", "3")))
+ACTION_RETRY_DELAY_SECONDS = max(
+    0.0,
+    float(os.getenv("ACTION_RETRY_DELAY_SECONDS", "2")),
+)
+RETRY_POLL_SECONDS = max(1, int(os.getenv("RETRY_POLL_SECONDS", "5")))
+REMINDER_POLL_SECONDS = max(1, int(os.getenv("REMINDER_POLL_SECONDS", "15")))
+
 # Notifications / reminders
 NOTIFY_ON_WIN = env_bool("NOTIFY_ON_WIN", True)
 NOTIFY_ON_REPLY = env_bool("NOTIFY_ON_REPLY", True)

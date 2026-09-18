@@ -54,13 +54,38 @@ CREATE TABLE IF NOT EXISTS telegram_accounts (
     username TEXT,
     enabled BOOLEAN NOT NULL DEFAULT true,
     authorized BOOLEAN NOT NULL DEFAULT false,
+    connected BOOLEAN NOT NULL DEFAULT false,
     last_seen_at TIMESTAMPTZ,
     last_error TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE telegram_accounts
+    ADD COLUMN IF NOT EXISTS connected BOOLEAN NOT NULL DEFAULT false;
+
 CREATE INDEX IF NOT EXISTS idx_telegram_accounts_user
 ON telegram_accounts(user_id);
+
+CREATE TABLE IF NOT EXISTS monitored_channels (
+    chat_id BIGINT PRIMARY KEY,
+    username TEXT,
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_monitored_channels_username
+ON monitored_channels(username);
+
+CREATE TABLE IF NOT EXISTS channel_accounts (
+    channel_id BIGINT NOT NULL REFERENCES monitored_channels(chat_id) ON DELETE CASCADE,
+    account_user_id BIGINT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY(channel_id, account_user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_channel_accounts_account
+ON channel_accounts(account_user_id);
 
 CREATE TABLE IF NOT EXISTS channel_message_events (
     id BIGSERIAL PRIMARY KEY,
@@ -68,11 +93,27 @@ CREATE TABLE IF NOT EXISTS channel_message_events (
     message_id BIGINT NOT NULL,
     event_kind TEXT NOT NULL,
     event_marker TEXT NOT NULL UNIQUE,
+    processing_status TEXT NOT NULL DEFAULT 'processed',
+    claimed_by TEXT,
+    lease_until TIMESTAMPTZ,
+    processed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE channel_message_events
+    ADD COLUMN IF NOT EXISTS processing_status TEXT NOT NULL DEFAULT 'processed';
+ALTER TABLE channel_message_events
+    ADD COLUMN IF NOT EXISTS claimed_by TEXT;
+ALTER TABLE channel_message_events
+    ADD COLUMN IF NOT EXISTS lease_until TIMESTAMPTZ;
+ALTER TABLE channel_message_events
+    ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ;
+
 CREATE INDEX IF NOT EXISTS idx_channel_message_events_message
 ON channel_message_events(chat_id, message_id);
+
+CREATE INDEX IF NOT EXISTS idx_channel_message_events_recovery
+ON channel_message_events(processing_status, lease_until);
 
 CREATE TABLE IF NOT EXISTS participation_actions (
     id BIGSERIAL PRIMARY KEY,
@@ -128,12 +169,25 @@ ON number_pool(giveaway_id);
 
 CREATE TABLE IF NOT EXISTS tracked_messages (
     id BIGSERIAL PRIMARY KEY,
+    giveaway_id BIGINT REFERENCES giveaways(id) ON DELETE CASCADE,
+    account_user_id BIGINT,
     chat_id BIGINT NOT NULL,
     message_id BIGINT NOT NULL,
     kind TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(chat_id, message_id, kind)
 );
+
+ALTER TABLE tracked_messages
+    ADD COLUMN IF NOT EXISTS giveaway_id BIGINT REFERENCES giveaways(id) ON DELETE CASCADE;
+ALTER TABLE tracked_messages
+    ADD COLUMN IF NOT EXISTS account_user_id BIGINT;
+
+CREATE INDEX IF NOT EXISTS idx_tracked_messages_giveaway
+ON tracked_messages(giveaway_id, account_user_id);
+
+CREATE INDEX IF NOT EXISTS idx_tracked_messages_reply_lookup
+ON tracked_messages(chat_id, message_id, account_user_id);
 
 CREATE TABLE IF NOT EXISTS notifications (
     id BIGSERIAL PRIMARY KEY,
@@ -167,6 +221,3 @@ CREATE TABLE IF NOT EXISTS reminders (
 
 CREATE INDEX IF NOT EXISTS idx_reminders_due
 ON reminders(sent, remind_at);
-
-CREATE INDEX IF NOT EXISTS idx_giveaways_status
-ON giveaways(status);

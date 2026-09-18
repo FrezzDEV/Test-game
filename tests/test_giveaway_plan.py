@@ -1,7 +1,10 @@
+import pytest
+
 from app.giveaways.planner import build_plan
 from app.giveaways.schema import (
     ACTION_JOIN_CHANNEL,
     ACTION_REPLY_DISCUSSION,
+    GiveawayPlan,
 )
 from app.giveaways.sequences import get_sequence
 
@@ -32,6 +35,7 @@ def test_builds_join_and_comment_plan():
 
     assert len(plan) == 2
     assert plan[1]["sequence_id"] == "giveaway_comment_default_v1"
+    assert plan[1]["target"] == "discussion"
 
 
 def test_unknown_sequence_requires_human():
@@ -55,3 +59,39 @@ def test_unknown_sequence_requires_human():
 
 def test_sequence_exists():
     assert get_sequence("giveaway_comment_default_v1")["steps"]
+
+
+def test_mismatched_action_codes_are_rejected():
+    with pytest.raises(ValueError):
+        GiveawayPlan.model_validate(
+            {
+                "detected": True,
+                "confidence": 0.99,
+                "action_codes": [ACTION_REPLY_DISCUSSION],
+                "actions": [
+                    {
+                        "code": ACTION_JOIN_CHANNEL,
+                        "type": "join_channel",
+                        "channel_username": "@required_channel",
+                    }
+                ],
+            }
+        )
+
+
+def test_missing_action_codes_are_derived_from_valid_actions():
+    plan = GiveawayPlan.model_validate(
+        {
+            "detected": True,
+            "confidence": 0.99,
+            "actions": [
+                {
+                    "code": ACTION_JOIN_CHANNEL,
+                    "type": "join_channel",
+                    "channel_username": "@required_channel",
+                }
+            ],
+        }
+    )
+
+    assert plan.action_codes == [ACTION_JOIN_CHANNEL]

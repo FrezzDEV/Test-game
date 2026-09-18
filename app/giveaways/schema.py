@@ -79,12 +79,13 @@ class GiveawayPlan(BaseModel):
         return any(action.code == ACTION_NUMBER_GUESS for action in self.actions)
 
     @model_validator(mode="after")
-    def normalize_action_codes(self):
+    def validate_action_codes(self):
         actual = [action.code for action in self.actions]
-        if not self.action_codes:
-            self.action_codes = actual
-        elif self.action_codes != actual:
-            self.action_codes = actual
+        if self.action_codes and self.action_codes != actual:
+            raise ValueError(
+                "action_codes must exactly match actions[].code in execution order"
+            )
+        self.action_codes = actual
         return self
 
 

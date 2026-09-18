@@ -2,7 +2,7 @@ import re
 
 from app.admin.bot import send_admin_message
 from app.config import ADMIN_CHAT_ID, NOTIFY_ON_MENTION, NOTIFY_ON_REPLY, NOTIFY_ON_WIN
-from app.database.db import claim_notification, find_recent_giveaway
+from app.database.db import claim_notification, find_related_giveaway
 
 _win_patterns = re.compile(
     r"(winner|you\s+won|congratulations|\bwin\b|"
@@ -51,9 +51,16 @@ async def incoming_message(event, account) -> None:
         )
 
     if NOTIFY_ON_WIN and _is_possible_win(text):
-        giveaway = await find_recent_giveaway(event.chat_id) if event.chat_id else None
+        giveaway = await find_related_giveaway(
+            int(event.chat_id),
+            int(message.reply_to_msg_id) if message.reply_to_msg_id else None,
+            account.user_id,
+        )
         if giveaway:
-            dedupe = f"win:{account.user_id}:{event.chat_id}:{event.id}:{giveaway['id']}"
+            dedupe = (
+                f"win:{account.user_id}:{event.chat_id}:"
+                f"{event.id}:{giveaway['id']}"
+            )
             if await claim_notification(dedupe):
                 await send_admin_message(
                     f"🏆 Возможная победа\n"
@@ -65,16 +72,24 @@ async def incoming_message(event, account) -> None:
                 )
 
 
-async def giveaway_detected(event, parsed: dict) -> None:
+async def giveaway_detected(
+    event,
+    parsed: dict,
+    chat_id: int | None = None,
+    message_id: int | None = None,
+) -> None:
     if not ADMIN_CHAT_ID:
         return
+    resolved_chat_id = chat_id if chat_id is not None else event.chat_id
+    resolved_message_id = message_id if message_id is not None else event.id
     codes = parsed.get("action_codes") or [
-        action.get("code") for action in parsed.get("actions", [])
+        action.get("code")
+        for action in parsed.get("actions", [])
     ]
     await send_admin_message(
         f"🎁 Розыгрыш найден\n"
         f"channel={parsed.get('channel_username') or '-'}\n"
-        f"chat_id={event.chat_id}, message_id={event.id}\n"
+        f"chat_id={resolved_chat_id}, message_id={resolved_message_id}\n"
         f"detected={parsed.get('detected')}\n"
         f"confidence={parsed.get('confidence')}\n"
         f"action_codes={codes}\n"
@@ -84,12 +99,20 @@ async def giveaway_detected(event, parsed: dict) -> None:
     )
 
 
-async def participation_result(event, parsed: dict, result: str) -> None:
+async def participation_result(
+    event,
+    parsed: dict,
+    result: str,
+    chat_id: int | None = None,
+    message_id: int | None = None,
+) -> None:
     if not ADMIN_CHAT_ID:
         return
+    resolved_chat_id = chat_id if chat_id is not None else event.chat_id
+    resolved_message_id = message_id if message_id is not None else event.id
     await send_admin_message(
         f"🤖 Участие: {result}\n"
-        f"chat_id={event.chat_id}, message_id={event.id}\n"
+        f"chat_id={resolved_chat_id}, message_id={resolved_message_id}\n"
         f"channel={parsed.get('channel_username') or '-'}\n"
         f"action_codes={parsed.get('action_codes') or []}"
     )

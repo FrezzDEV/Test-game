@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 
+
 load_dotenv()
 
 
@@ -12,6 +13,7 @@ def env_bool(name: str, default: bool = False) -> bool:
 TG_API_ID = int(os.environ["TG_API_ID"])
 TG_API_HASH = os.environ["TG_API_HASH"]
 TG_SESSION = os.getenv("TG_SESSION", "giveaway_auto_join")
+TG_SESSION_DIR = os.getenv("TG_SESSION_DIR", "./sessions")
 TG_PHONE = os.getenv("TG_PHONE") or None
 TG_2FA_PASSWORD = os.getenv("TG_2FA_PASSWORD") or None
 

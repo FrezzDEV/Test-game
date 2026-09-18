@@ -24,6 +24,7 @@ from app.database.db import (
     mark_number_sent,
     mark_processed,
     maybe_clear_number_pool,
+    release_number,
     reserve_number,
 )
 from app.giveaways.detector import detect
@@ -277,14 +278,21 @@ class AccountManager:
                     error=error,
                 )
 
-                if ok and action.get("code") == 6:
+                if action.get("code") == 6:
                     assigned = number_assignments.get(account.user_id)
                     if assigned is not None:
-                        await mark_number_sent(
-                            giveaway_id,
-                            account.user_id,
-                            assigned,
-                        )
+                        if ok:
+                            await mark_number_sent(
+                                giveaway_id,
+                                account.user_id,
+                                assigned,
+                            )
+                        else:
+                            await release_number(
+                                giveaway_id,
+                                account.user_id,
+                                assigned,
+                            )
 
                 if not ok:
                     all_ok = False

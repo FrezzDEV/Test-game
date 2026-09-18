@@ -30,8 +30,13 @@ ADMIN_USER_IDS = {
 }
 
 DATABASE_URL = os.environ["DATABASE_URL"]
-MONITORED_CHATS = [
-    x.strip() for x in os.getenv("MONITORED_CHATS", "").split(",") if x.strip()
+MONITORED_CHANNELS = [
+    x.strip()
+    for x in (
+        os.getenv("MONITORED_CHANNELS")
+        or os.getenv("MONITORED_CHATS", "")
+    ).split(",")
+    if x.strip()
 ]
 
 AUTO_JOIN_ENABLED = env_bool("AUTO_JOIN_ENABLED", False)

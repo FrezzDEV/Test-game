@@ -25,7 +25,9 @@ def load_session_credentials(path: str) -> dict[str, SessionCredentials]:
     result: dict[str, SessionCredentials] = {}
     for session_name, value in raw.items():
         if not isinstance(session_name, str) or not isinstance(value, dict):
-            raise ValueError("Each session config must be an object keyed by session name")
+            raise ValueError(
+                "Each session config must be an object keyed by session name"
+            )
 
         api_id_raw = value.get("api_id")
         api_hash_raw = value.get("api_hash")
@@ -57,14 +59,16 @@ def credential_candidates(
     override = configured.get(session_name)
     candidates: list[SessionCredentials] = []
 
-    if override and override.api_id and override.api_hash:
-        candidates.append(override)
-
+    # Try the global .env credentials first. If they fail, fall back to the
+    # session-specific credentials from config/accounts.json.
     if env_credentials.api_id and env_credentials.api_hash:
+        candidates.append(env_credentials)
+
+    if override and override.api_id and override.api_hash:
         if not candidates or (
-            candidates[0].api_id != env_credentials.api_id
-            or candidates[0].api_hash != env_credentials.api_hash
+            candidates[0].api_id != override.api_id
+            or candidates[0].api_hash != override.api_hash
         ):
-            candidates.append(env_credentials)
+            candidates.append(override)
 
     return candidates

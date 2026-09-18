@@ -221,11 +221,7 @@ async def reserve_number(
                 return int(existing["number_value"])
 
             capacity = int(maximum) - int(minimum) + 1
-            used = await conn.fetchval(
-                "SELECT COUNT(*) FROM number_pool WHERE giveaway_id=$1",
-                giveaway_id,
-            )
-            if int(used or 0) >= capacity:
+            if capacity <= 0:
                 return None
 
             for _ in range(40):
@@ -355,8 +351,20 @@ async def maybe_clear_number_pool(
             )
 
             account_count = len(set(account_user_ids))
+            historical_sent = await conn.fetchval(
+                """
+                SELECT COUNT(DISTINCT (payload->>'number_value'))
+                FROM participation_actions
+                WHERE giveaway_id=$1
+                  AND action_code=6
+                  AND status='success'
+                  AND payload ? 'number_value'
+                """,
+                giveaway_id,
+            )
             complete = (
                 int(total_reserved or 0) >= capacity
+                or int(historical_sent or 0) >= capacity
                 or (
                     account_count > 0
                     and int(total_sent or 0) >= account_count

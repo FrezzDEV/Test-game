@@ -28,5 +28,5 @@ def test_session_discovery_falls_back_to_default_name(tmp_path, monkeypatch):
 
     manager = AccountManager()
     assert [p.name for p in manager._session_paths()] == [
-        "giveaway_auto_join",
+        "giveaway_auto_join.session",
     ]

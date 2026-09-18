@@ -5,10 +5,10 @@ Telegram user-account automation for detecting giveaways, extracting participati
 ## Architecture
 
 ```
-Telegram user session (Telethon)
+Telegram user sessions (Telethon)
         |
         v
-message monitor
+broadcast-channel monitor
         |
         v
 AI detector/parser
@@ -105,6 +105,28 @@ A sequence looks like:
 
 The model may choose only an existing sequence ID. It cannot invent or rewrite the message text.
 
+## Multi-account sessions
+
+All `*.session` files directly inside `TG_SESSION_DIR` are loaded on startup. Each file is treated as a separate Telegram user account with its own Telethon client. Separate session files matter because Telethon's default SQLite session storage should not be opened by multiple clients at the same time.
+
+For participation, every discovered account receives the same validated plan. Accounts execute concurrently, with an optional stagger controlled by:
+
+```env
+ACCOUNT_ACTION_DELAY_MS=250
+```
+
+`0` means no artificial stagger. `250` means account 2 starts 250 ms after account 1, account 3 after 500 ms, and so on.
+
+## Channel monitoring
+
+Every discovered account registers both `NewMessage` and `MessageEdited`. The handler first verifies that the peer is a Telegram **broadcast channel** (`broadcast=true` and not `megagroup=true`). Linked discussion groups and ordinary chats are ignored.
+
+When `MONITORED_CHANNELS` is empty, every broadcast channel that sends updates to the account is considered. When it is set, only the configured channels are processed.
+
+The monitor uses Telethon update catch-up on startup, so missed updates can be delivered after reconnecting.
+
+The database stores a unique event marker for each new/edit event. This prevents multiple accounts from sending the same post to the AI repeatedly while still allowing a distinct edit of the same post to be analyzed again.
+
 ## Environment
 
 The `.env` file contains:
@@ -123,7 +145,8 @@ Never commit real credentials, `.env`, Telegram session files, or bot tokens.
 `sql/schema.sql` stores:
 - detected giveaways and their full validated plan;
 - source channel username and AI confidence;
-- action code/type, sequence ID, payload, status and error;
+- action code/type, account ID, sequence ID, payload, status and error;
+- temporary unique-number reservations for number-guess actions;
 - tracked messages and notifications;
 - reminder records.
 
@@ -151,6 +174,14 @@ The system stops automatic execution when:
 - a requested action is not in the deterministic executor.
 
 The executor does not bypass CAPTCHA or anti-bot challenges.
+
+## Unique numbers
+
+For a `number_guess` action with an explicit range, the application atomically reserves one different number per account in PostgreSQL. A PostgreSQL advisory transaction lock prevents concurrent account tasks from reserving the same number.
+
+The temporary `number_pool` is cleaned when all active accounts have sent their number or when the available range is exhausted. Successful number values remain in the action history, so cleaning the temporary pool does not permit the same number to be reused for the same giveaway.
+
+An exact single-number answer is therefore available to at most one account under the unique-number rule. Other accounts continue with their remaining plan steps and report the number step as unavailable.
 
 ## Telegram comments
 

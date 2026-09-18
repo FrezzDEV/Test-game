@@ -687,7 +687,12 @@ async def get_account_rows() -> list[dict]:
     rows = await pool.fetch(
         """
         SELECT id,session_name,user_id,username,enabled,authorized,
-               connected,last_seen_at,last_error
+               connected,
+               (
+                   connected=true
+                   AND last_seen_at >= now()-interval '90 seconds'
+               ) AS live,
+               last_seen_at,last_error
         FROM telegram_accounts
         ORDER BY session_name
         """
@@ -701,7 +706,10 @@ async def get_account_stats() -> dict:
         """
         SELECT COUNT(*) AS total,
                COUNT(*) FILTER(
-                   WHERE enabled=true AND authorized=true AND connected=true
+                   WHERE enabled=true
+                     AND authorized=true
+                     AND connected=true
+                     AND last_seen_at >= now()-interval '90 seconds'
                ) AS online,
                COUNT(*) FILTER(WHERE authorized=false) AS unauthorized,
                COUNT(*) FILTER(WHERE enabled=false) AS disabled

@@ -23,6 +23,7 @@ from app.database.db import (
     mark_action,
     mark_number_sent,
     mark_processed,
+    maybe_clear_number_pool,
     reserve_number,
 )
 from app.giveaways.detector import detect
@@ -224,6 +225,7 @@ class AccountManager:
         number_assignments = await self._allocate_number_assignments(
             giveaway_id=giveaway_id,
             plan=plan,
+            completed_by_account=completed_by_account,
         )
 
         async def run_for_account(index: int, account: TelegramAccount) -> bool:
@@ -295,6 +297,12 @@ class AccountManager:
             return_exceptions=False,
         )
 
+
+        await self._maybe_cleanup_number_pool(
+            giveaway_id=giveaway_id,
+            plan=plan,
+        )
+
         if results and all(results):
             return "success"
         if any(results):
@@ -305,6 +313,7 @@ class AccountManager:
         self,
         giveaway_id: int,
         plan: list[dict],
+        completed_by_account: dict[int, set[str]],
     ) -> dict[int, int]:
         number_actions = [action for action in plan if action.get("code") == 6]
         if not number_actions:
@@ -323,7 +332,11 @@ class AccountManager:
             return {}
 
         assignments: dict[int, int] = {}
+        action_key_value = action_key(action)
         for account in self.accounts:
+            if action_key_value in completed_by_account.get(account.user_id, set()):
+                continue
+
             value = await reserve_number(
                 giveaway_id=giveaway_id,
                 account_user_id=account.user_id,
@@ -334,6 +347,29 @@ class AccountManager:
                 assignments[account.user_id] = value
 
         return assignments
+
+    async def _maybe_cleanup_number_pool(
+        self,
+        giveaway_id: int,
+        plan: list[dict],
+    ) -> None:
+        number_actions = [action for action in plan if action.get("code") == 6]
+        if not number_actions:
+            return
+
+        action = number_actions[0]
+        exact_value = action.get("number_value")
+        minimum = exact_value if exact_value is not None else action.get("min_number")
+        maximum = exact_value if exact_value is not None else action.get("max_number")
+        if minimum is None or maximum is None:
+            return
+
+        await maybe_clear_number_pool(
+            giveaway_id=giveaway_id,
+            account_user_ids=[account.user_id for account in self.accounts],
+            minimum=int(minimum),
+            maximum=int(maximum),
+        )
 
     async def run_until_disconnected(self) -> None:
         if not self.accounts:

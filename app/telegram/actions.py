@@ -26,95 +26,122 @@ class ActionExecutor:
             return fresh[0] if fresh else None
         return fresh
 
-    async def _send_text(self, action: dict, message, value: str) -> None:
+    async def _send_text(self, action: dict, message, value: str):
         target = action.get("target") or "source_post"
         if target in {"discussion", "linked_discussion", "comment"}:
-            await self.client.send_message(
+            return await self.client.send_message(
                 message.chat_id,
                 value,
                 comment_to=message.id,
             )
-            return
-        await self.client.send_message(
+        return await self.client.send_message(
             message.chat_id,
             value,
             reply_to=message.id,
         )
 
-    async def execute(self, action: dict, message) -> bool:
+    @staticmethod
+    def _result(ok: bool, sent_messages: list | None = None) -> dict:
+        return {
+            "ok": ok,
+            "message_ids": [
+                {
+                    "chat_id": int(item.chat_id),
+                    "message_id": int(item.id),
+                }
+                for item in (sent_messages or [])
+                if item is not None
+            ],
+        }
+
+    async def execute(self, action: dict, message) -> dict:
         code = int(action["code"])
 
         if code == ACTION_JOIN_CHANNEL:
             channel = action.get("channel_username")
             if not channel:
-                return False
+                return self._result(False)
             try:
                 await self.client(JoinChannelRequest(channel))
             except errors.UserAlreadyParticipantError:
-                return True
-            return True
+                return self._result(True)
+            return self._result(True)
 
         if code == ACTION_REPLY_DISCUSSION:
             sequence_id = action.get("sequence_id")
             sequence = get_sequence(sequence_id) if sequence_id else None
             if not sequence:
-                return False
+                return self._result(False)
             steps = sequence.get("steps") or []
             if not steps:
-                return False
+                return self._result(False)
 
-            target_override = action.get("target") or "discussion"
+            # Code 1 is always a linked-discussion comment.
+            sent_messages = []
             for step in steps:
                 text = step.get("text")
                 if not text:
-                    return False
-                await self._send_text({"target": target_override}, message, text)
+                    return self._result(False, sent_messages)
+                sent = await self._send_text(
+                    {"target": "discussion"},
+                    message,
+                    text,
+                )
+                sent_messages.append(sent)
                 wait_seconds = float(step.get("wait_seconds_after", 0))
                 if wait_seconds > 0:
                     await asyncio.sleep(wait_seconds)
-            return True
+            return self._result(True, sent_messages)
 
         if code == ACTION_CLICK_BUTTON:
             button_text = action.get("button_text")
             if not button_text:
-                return False
+                return self._result(False)
             account_message = await self._get_message_for_client(message)
             if account_message is None:
-                return False
+                return self._result(False)
             for row in account_message.buttons or []:
                 for button in row:
                     if getattr(button, "text", None) == button_text:
                         await account_message.click(text=button_text)
-                        return True
-            return False
+                        return self._result(True)
+            return self._result(False)
 
         if code == ACTION_REACTION:
             emoji = action.get("emoji")
             account_message = await self._get_message_for_client(message)
-            react = getattr(account_message, "react", None) if account_message else None
+            react = (
+                getattr(account_message, "react", None)
+                if account_message
+                else None
+            )
             if not emoji or react is None:
-                return False
+                return self._result(False)
             await react(emoji)
-            return True
+            return self._result(True)
 
         if code == ACTION_NUMBER_GUESS:
             value = action.get("number_value")
             if value is None:
                 if action.get("min_number") is None or action.get("max_number") is None:
-                    return False
+                    return self._result(False)
                 value = choose_number(
                     int(action["min_number"]),
                     int(action["max_number"]),
                 )
-            await self._send_text(action, message, str(value))
-            return True
+            sent = await self._send_text(
+                action,
+                message,
+                str(value),
+            )
+            return self._result(True, [sent])
 
         if code == ACTION_WORD_GUESS:
             value = action.get("word_answer") or action.get("exact_answer")
             if not value:
-                return False
-            await self._send_text(action, message, value)
-            return True
+                return self._result(False)
+            sent = await self._send_text(action, message, value)
+            return self._result(True, [sent])
 
         if code == ACTION_QUIZ:
             button_text = action.get("button_text")
@@ -122,15 +149,15 @@ class ActionExecutor:
             if button_text:
                 account_message = await self._get_message_for_client(message)
                 if account_message is None:
-                    return False
+                    return self._result(False)
                 for row in account_message.buttons or []:
                     for button in row:
                         if getattr(button, "text", None) == button_text:
                             await account_message.click(text=button_text)
-                            return True
+                            return self._result(True)
             if exact_answer:
-                await self._send_text(action, message, exact_answer)
-                return True
-            return False
+                sent = await self._send_text(action, message, exact_answer)
+                return self._result(True, [sent])
+            return self._result(False)
 
-        return False
+        return self._result(False)

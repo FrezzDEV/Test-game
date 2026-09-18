@@ -35,7 +35,7 @@ async def status_handler(message: Message):
     accounts = await get_account_stats()
     await message.answer(
         "🟢 Status\n"
-        f"Accounts: {accounts['online']}/{accounts['total']} authorized\n"
+        f"Accounts connected: {accounts['online']}/{accounts['total']}\n"
         f"Unauthorized: {accounts['unauthorized']}\n"
         f"Disabled: {accounts['disabled']}\n"
         f"Giveaways 24h: {stats['last_24h']}\n"
@@ -54,7 +54,7 @@ async def accounts_handler(message: Message):
         return
     lines = ["👤 Аккаунты"]
     for row in rows:
-        state = "✅" if row["authorized"] and row["enabled"] else "❌"
+        state = "✅" if row["authorized"] and row["enabled"] and row["connected"] else "⚠️"
         username = f"@{row['username']}" if row["username"] else "-"
         lines.append(
             f"{state} {row['session_name']} | "

@@ -46,7 +46,7 @@ def build_plan(parsed: dict) -> list[dict]:
             if not sequence or not sequence.get("steps"):
                 return []
             data["sequence_id"] = sequence_id
-            data["target"] = action.target or "source_post"
+            data["target"] = "discussion"
 
         elif action.code == ACTION_JOIN_CHANNEL:
             if not action.channel_username:

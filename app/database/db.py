@@ -263,6 +263,14 @@ async def reserve_number(
                     WHERE np.giveaway_id=$3
                       AND np.number_value=candidate
                 )
+                AND NOT EXISTS (
+                    SELECT 1
+                    FROM participation_actions pa
+                    WHERE pa.giveaway_id=$3
+                      AND pa.action_code=6
+                      AND pa.status='success'
+                      AND pa.payload->>'number_value'=candidate::text
+                )
                 LIMIT 1
                 """,
                 minimum,

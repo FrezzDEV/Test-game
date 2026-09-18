@@ -154,7 +154,7 @@ The executor does not bypass CAPTCHA or anti-bot challenges.
 
 ## Telegram comments
 
-Telethon supports commenting on a channel post through `client.send_message(..., comment_to=message_id)`, which is what action code 1 uses for the linked discussion. citeturn603691search0turn443705search1
+Telethon provides the `comment_to` parameter on `send_message` for leaving a comment on a broadcast-channel post through its linked discussion. Action code 1 uses that mechanism.
 
 ## Run
 

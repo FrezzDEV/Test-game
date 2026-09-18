@@ -75,9 +75,7 @@ CREATE INDEX IF NOT EXISTS idx_actions_account
 ON participation_actions(giveaway_id, account_user_id);
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_actions_account_key
-ON participation_actions(giveaway_id, account_user_id, action_key)
-WHERE account_user_id IS NOT NULL
-  AND action_key IS NOT NULL;
+ON participation_actions(giveaway_id, account_user_id, action_key);
 
 CREATE TABLE IF NOT EXISTS number_pool (
     id BIGSERIAL PRIMARY KEY,

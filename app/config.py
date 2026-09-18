@@ -39,7 +39,19 @@ SCAN_OLD_MESSAGES = env_bool("SCAN_OLD_MESSAGES", False)
 TIMEZONE = os.getenv("TIMEZONE", "Europe/Kyiv")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
+# Participation fan-out across all discovered user sessions.
+ACCOUNT_ACTION_DELAY_MS = max(
+    0,
+    int(os.getenv("ACCOUNT_ACTION_DELAY_MS", "250")),
+)
+
+# Notifications / reminders
 NOTIFY_ON_WIN = env_bool("NOTIFY_ON_WIN", True)
 NOTIFY_ON_REPLY = env_bool("NOTIFY_ON_REPLY", True)
 NOTIFY_ON_MENTION = env_bool("NOTIFY_ON_MENTION", True)
 REMINDER_INTERVAL_MINUTES = int(os.getenv("REMINDER_INTERVAL_MINUTES", "30"))
+
+ACTION_SEQUENCES_PATH = os.getenv(
+    "ACTION_SEQUENCES_PATH",
+    "./config/action_sequences.json",
+)

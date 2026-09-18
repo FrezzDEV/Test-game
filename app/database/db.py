@@ -58,6 +58,27 @@ async def claim_channel_event(
     return row is not None
 
 
+async def renew_channel_event_lease(
+    event_marker: str,
+    worker_id: str,
+    lease_seconds: int,
+) -> bool:
+    pool = await get_pool()
+    result = await pool.execute(
+        """
+        UPDATE channel_message_events
+        SET lease_until=now()+make_interval(secs => $3)
+        WHERE event_marker=$1
+          AND claimed_by=$2
+          AND processing_status='processing'
+        """,
+        event_marker,
+        worker_id,
+        int(lease_seconds),
+    )
+    return result.endswith("1")
+
+
 async def complete_channel_event(event_marker: str, worker_id: str) -> None:
     pool = await get_pool()
     await pool.execute(

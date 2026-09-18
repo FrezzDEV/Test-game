@@ -42,6 +42,7 @@ from app.database.db import (
     record_giveaway_version,
     release_channel_event,
     release_number,
+    renew_channel_event_lease,
     reserve_number,
     schedule_reminder,
     set_giveaway_status,
@@ -296,6 +297,24 @@ class AccountManager:
     async def _handle_edited_message(self, event) -> None:
         await self._handle_channel_event(event, "edited")
 
+    async def _renew_event_lease(self, event_marker: str, worker_id: str) -> None:
+        interval = max(5, EVENT_LEASE_SECONDS // 3)
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                renewed = await renew_channel_event_lease(
+                    event_marker,
+                    worker_id,
+                    EVENT_LEASE_SECONDS,
+                )
+                if not renewed:
+                    return
+            except Exception as exc:
+                print(
+                    f"Event lease renewal error for {event_marker}: "
+                    f"{type(exc).__name__}: {exc}"
+                )
+
     async def _handle_channel_event(self, event, kind: str) -> None:
         if not event.chat_id or not await self._is_broadcast_channel(event):
             return
@@ -315,6 +334,10 @@ class AccountManager:
         ):
             return
 
+        worker_id = str(account.user_id)
+        lease_task = asyncio.create_task(
+            self._renew_event_lease(marker, worker_id)
+        )
         try:
             await self._process_channel_message(
                 account,
@@ -323,13 +346,17 @@ class AccountManager:
                 kind,
                 marker,
             )
-            await complete_channel_event(marker, str(account.user_id))
         except Exception as exc:
-            await release_channel_event(marker, str(account.user_id))
+            await release_channel_event(marker, worker_id)
             print(
                 f"Channel event processing error for {event.chat_id}:{event.id}: "
                 f"{type(exc).__name__}: {exc}"
             )
+        else:
+            await complete_channel_event(marker, worker_id)
+        finally:
+            lease_task.cancel()
+            await asyncio.gather(lease_task, return_exceptions=True)
 
     async def _process_channel_message(
         self,

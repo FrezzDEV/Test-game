@@ -24,36 +24,43 @@ async def incoming_message(event) -> None:
     text = event.raw_text or ""
 
     if NOTIFY_ON_REPLY and message.is_reply and message.reply_to_msg_id:
-        await send_admin_message(
-            f"↩️ Ответ на наше сообщение
-"
-            f"chat_id={event.chat_id}, message_id={event.id}
+        try:
+            replied_to = await message.get_reply_message()
+        except Exception:
+            replied_to = None
 
-{text[:3000]}"
-        )
-
-    if NOTIFY_ON_MENTION:
-        entities = getattr(message, "entities", None) or []
-        mentioned = any(getattr(e, "user_id", None) == _ME.id for e in entities)
-        if mentioned or getattr(message, "mentioned", False):
+        if replied_to is not None and getattr(replied_to, "sender_id", None) == _ME.id:
             await send_admin_message(
-                f"🔔 Нас отметили
-chat_id={event.chat_id}, message_id={event.id}
-
-{text[:3000]}"
+                f"↩️ Ответ на наше сообщение\n"
+                f"chat_id={event.chat_id}, message_id={event.id}\n\n"
+                f"{text[:3000]}"
             )
+
+    if NOTIFY_ON_MENTION and getattr(message, "mentioned", False):
+        await send_admin_message(
+            f"🔔 Нас отметили\n"
+            f"chat_id={event.chat_id}, message_id={event.id}\n\n"
+            f"{text[:3000]}"
+        )
 
 
 async def giveaway_detected(event, parsed: dict) -> None:
     if not ADMIN_CHAT_ID:
         return
+
+    codes = parsed.get("action_codes") or [
+        action.get("code") for action in parsed.get("actions", [])
+    ]
     await send_admin_message(
-        f"🎁 Розыгрыш найден
-chat_id={event.chat_id}, message_id={event.id}
-"
-        f"type={parsed.get('type')}, confidence={parsed.get('confidence')}
-"
-        f"needs_human={parsed.get('needs_human')}"
+        f"🎁 Розыгрыш найден\n"
+        f"channel={parsed.get('channel_username') or '-'}\n"
+        f"chat_id={event.chat_id}, message_id={event.id}\n"
+        f"detected={parsed.get('detected')}\n"
+        f"confidence={parsed.get('confidence')}\n"
+        f"action_codes={codes}\n"
+        f"write_sequence_id={parsed.get('write_sequence_id') or '-'}\n"
+        f"needs_human={parsed.get('needs_human')}\n"
+        f"reason={parsed.get('reason') or '-'}"
     )
 
 
@@ -61,15 +68,13 @@ async def participation_result(event, parsed: dict, result: str) -> None:
     if not ADMIN_CHAT_ID:
         return
     await send_admin_message(
-        f"🤖 Участие: {result}
-chat_id={event.chat_id}, message_id={event.id}
-"
-        f"type={parsed.get('type')}"
+        f"🤖 Участие: {result}\n"
+        f"chat_id={event.chat_id}, message_id={event.id}\n"
+        f"channel={parsed.get('channel_username') or '-'}\n"
+        f"action_codes={parsed.get('action_codes') or []}"
     )
 
 
 async def notify_win(text: str) -> None:
     if NOTIFY_ON_WIN and ADMIN_CHAT_ID:
-        await send_admin_message(f"🏆 Возможная победа
-
-{text[:3500]}")
+        await send_admin_message(f"🏆 Возможная победа\n\n{text[:3500]}")

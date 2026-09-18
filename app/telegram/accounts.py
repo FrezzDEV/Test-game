@@ -42,6 +42,7 @@ from app.database.db import (
     record_giveaway_version,
     release_channel_event,
     release_number,
+    reserve_number,
     schedule_reminder,
     set_giveaway_status,
     track_message,
@@ -464,7 +465,7 @@ class AccountManager:
 
         last_error = None
         for _ in range(NUMBER_SEND_RETRIES):
-            value = await __import__("app.database.db", fromlist=["reserve_number"]).reserve_number(
+            value = await reserve_number(
                 giveaway_id,
                 account.user_id,
                 int(minimum),

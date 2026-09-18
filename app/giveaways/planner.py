@@ -41,7 +41,7 @@ def build_plan(parsed: dict) -> list[dict]:
         elif action.code == ACTION_CLICK_BUTTON:
             if not action.button_text:
                 return []
-        
+
         elif action.code == ACTION_REACTION:
             if not action.emoji:
                 return []
@@ -62,6 +62,10 @@ def build_plan(parsed: dict) -> list[dict]:
                 return []
             if not action.word_answer:
                 data["word_answer"] = action.exact_answer
+
+        else:
+            # Reserved/unknown action codes are never executed implicitly.
+            return []
 
         result.append(data)
 

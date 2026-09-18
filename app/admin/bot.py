@@ -54,7 +54,7 @@ async def accounts_handler(message: Message):
         return
     lines = ["👤 Аккаунты"]
     for row in rows:
-        state = "✅" if row["authorized"] and row["enabled"] and row["connected"] else "⚠️"
+        state = "✅" if row["authorized"] and row["enabled"] and row["live"] else "⚠️"
         username = f"@{row['username']}" if row["username"] else "-"
         lines.append(
             f"{state} {row['session_name']} | "

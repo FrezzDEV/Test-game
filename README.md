@@ -196,3 +196,17 @@ Telethon provides the `comment_to` parameter on `send_message` for leaving a com
 5. Start: `python -m app.main`.
 
 The Telethon session is stored under `TG_SESSION_DIR` and is excluded from Git.
+
+
+## Completion of the 1-8 operational layer
+
+1. **State machine:** giveaway status is persisted as parsed, ready, executing, success, partial, failed, needs_human, retry_requested or skipped.
+2. **Edit versions:** every detected edit gets a separate immutable record in `giveaway_versions`; the main giveaway row keeps the current plan/version. Completed actions are not repeated after an edit.
+3. **Number retry:** failed numeric sends release the reserved number and retry with another unique value, while successful values stay in action history.
+4. **Account registry:** every discovered session is registered in `telegram_accounts` with authorization/error state and last-seen timestamp.
+5. **Multi-account notifications:** reply, mention and possible-win notifications identify the specific account that received the event.
+6. **Admin controls:** `/status`, `/accounts`, `/pending` and `/retry <giveaway_id>` are backed by PostgreSQL.
+7. **Win detector:** new incoming messages with winner-like terms can produce a deduplicated "possible win" notification tied to a recent giveaway.
+8. **Reminder worker:** due reminder rows are polled by a background worker and sent through the admin Bot API.
+
+The automation still does not solve CAPTCHAs/anti-bot challenges and does not invent missing answers.

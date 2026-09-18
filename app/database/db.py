@@ -343,6 +343,26 @@ async def mark_number_sent(
     )
 
 
+async def release_number(
+    giveaway_id: int,
+    account_user_id: int,
+    number_value: int,
+) -> None:
+    pool = await get_pool()
+    await pool.execute(
+        """
+        DELETE FROM number_pool
+        WHERE giveaway_id=$1
+          AND account_user_id=$2
+          AND number_value=$3
+          AND status='reserved'
+        """,
+        giveaway_id,
+        account_user_id,
+        number_value,
+    )
+
+
 async def maybe_clear_number_pool(
     giveaway_id: int,
     account_user_ids: list[int],
@@ -362,10 +382,6 @@ async def maybe_clear_number_pool(
                 int(giveaway_id),
             )
 
-            total_reserved = await conn.fetchval(
-                "SELECT COUNT(*) FROM number_pool WHERE giveaway_id=$1",
-                giveaway_id,
-            )
             total_sent = await conn.fetchval(
                 """
                 SELECT COUNT(*)
@@ -389,8 +405,7 @@ async def maybe_clear_number_pool(
                 giveaway_id,
             )
             complete = (
-                int(total_reserved or 0) >= capacity
-                or int(historical_sent or 0) >= capacity
+                int(historical_sent or 0) >= capacity
                 or (
                     account_count > 0
                     and int(total_sent or 0) >= account_count

@@ -1,0 +1,8 @@
+{
+  "session_name_without_extension": {
+    "api_id": 123456,
+    "api_hash": "0123456789abcdef0123456789abcdef",
+    "phone": "+380...",
+    "2fa_password": "optional"
+  }
+}

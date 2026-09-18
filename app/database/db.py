@@ -5,6 +5,7 @@ import random
 import asyncpg
 
 from app.config import DATABASE_URL
+from app.giveaways.state import VALID_STATUSES
 
 _pool = None
 
@@ -62,6 +63,8 @@ async def mark_processed(chat_id: int, message_id: int, giveaway_type: str, resu
 
 
 async def set_giveaway_status(giveaway_id: int, status: str) -> None:
+    if status not in VALID_STATUSES:
+        raise ValueError(f"Invalid giveaway status: {status}")
     pool = await get_pool()
     await pool.execute("UPDATE giveaways SET status=$2 WHERE id=$1", giveaway_id, status)
 
@@ -431,8 +434,8 @@ async def claim_notification(dedupe_key: str) -> bool:
     pool = await get_pool()
     row = await pool.fetchrow(
         """
-        INSERT INTO notifications(dedupe_key,sent_at)
-        VALUES($1,now())
+        INSERT INTO notifications(dedupe_key,kind,sent_at)
+        VALUES($1,'dedupe',now())
         ON CONFLICT(dedupe_key) DO NOTHING
         RETURNING id
         """,

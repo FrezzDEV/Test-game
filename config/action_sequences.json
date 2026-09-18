@@ -1,0 +1,11 @@
+{
+  "giveaway_comment_default_v1": {
+    "description": "Один заранее заданный нейтральный комментарий участника.",
+    "steps": [
+      {
+        "text": "Участвую! 🍀",
+        "wait_seconds_after": 0
+      }
+    ]
+  }
+}

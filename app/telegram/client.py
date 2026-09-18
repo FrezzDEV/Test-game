@@ -2,6 +2,7 @@ from pathlib import Path
 
 from telethon import TelegramClient, events
 
+import app.admin.notifier as notify
 from app.config import (
     AUTO_JOIN_ENABLED,
     MONITORED_CHATS,
@@ -12,10 +13,13 @@ from app.config import (
     TG_SESSION,
     TG_SESSION_DIR,
 )
-from app.database.db import already_processed, mark_processed
+from app.database.db import (
+    already_processed,
+    mark_action,
+    mark_processed,
+)
 from app.giveaways.detector import detect
 from app.giveaways.planner import build_plan
-from app.admin.notifier import notify
 from app.telegram.actions import ActionExecutor
 
 
@@ -36,28 +40,63 @@ async def handle_message(event) -> None:
     if await already_processed(event.chat_id, event.id):
         return
 
-    parsed = await detect(text)
-    if not parsed.get("is_giveaway"):
+    chat = await event.get_chat()
+    source_username = getattr(chat, "username", None)
+
+    parsed = await detect(
+        text,
+        source_channel_username=source_username,
+    )
+    if not parsed.get("detected"):
         return
+
+    execution_enabled = AUTO_JOIN_ENABLED and not parsed.get("needs_human")
+    status = "ready" if execution_enabled else "detected_only"
+    giveaway_id = await mark_processed(
+        event.chat_id,
+        event.id,
+        parsed.get("actions", [{}])[0].get("type", "unknown"),
+        status,
+        plan=parsed,
+    )
 
     await notify.giveaway_detected(event, parsed)
 
-    if not AUTO_JOIN_ENABLED or parsed.get("needs_human"):
+    if not execution_enabled:
+        return
+
+    plan = build_plan(parsed)
+    if not plan:
         await mark_processed(
             event.chat_id,
             event.id,
-            parsed.get("type", "unknown"),
-            "detected_only",
+            "unknown",
+            "needs_human",
+            plan=parsed,
         )
         return
 
     results = []
-    for action in build_plan(parsed):
+    for step_index, action in enumerate(plan):
         try:
             ok = await executor.execute(action, event.message)
             results.append("ok" if ok else "failed")
+            await mark_action(
+                giveaway_id=giveaway_id,
+                action=action,
+                step_index=step_index,
+                status="success" if ok else "failed",
+                error=None if ok else "executor_returned_false",
+            )
         except Exception as exc:
-            results.append(f"error:{type(exc).__name__}")
+            results.append("failed")
+            await mark_action(
+                giveaway_id=giveaway_id,
+                action=action,
+                step_index=step_index,
+                status="error",
+                error=f"{type(exc).__name__}: {exc}",
+            )
 
     result = (
         "success"
@@ -67,8 +106,9 @@ async def handle_message(event) -> None:
     await mark_processed(
         event.chat_id,
         event.id,
-        parsed.get("type", "unknown"),
+        parsed.get("actions", [{}])[0].get("type", "unknown"),
         result,
+        plan=parsed,
     )
     await notify.participation_result(event, parsed, result)
 
